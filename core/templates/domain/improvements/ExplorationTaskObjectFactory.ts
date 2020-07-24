@@ -28,7 +28,7 @@ import { ImprovementsConstants } from
 import {
   IneffectiveFeedbackLoopTask,
   IneffectiveFeedbackLoopTaskObjectFactory
-} from './IneffectiveFeedbackLoopTaskObjectFactory';
+} from 'domain/improvements/IneffectiveFeedbackLoopTaskObjectFactory';
 import {
   NeedsGuidingResponsesTask,
   NeedsGuidingResponsesTaskObjectFactory
@@ -37,6 +37,18 @@ import {
   SuccessiveIncorrectAnswersTask,
   SuccessiveIncorrectAnswersTaskObjectFactory
 } from 'domain/improvements/SuccessiveIncorrectAnswersTaskObjectFactory';
+
+export type ExplorationTaskType = (
+  'high_bounce_rate' |
+  'ineffective_feedback_loop' |
+  'needs_guiding_responses' |
+  'successive_incorrect_answers');
+
+export type ExplorationTaskBackendDict = (
+  ITaskEntryBackendDict<'high_bounce_rate'> |
+  ITaskEntryBackendDict<'ineffective_feedback_loop'> |
+  ITaskEntryBackendDict<'needs_guiding_responses'> |
+  ITaskEntryBackendDict<'successive_incorrect_answers'>);
 
 export type ExplorationTask = (
   HighBounceRateTask |
@@ -55,20 +67,60 @@ export class ExplorationTaskObjectFactory {
       private siaTaskObjectFactory:
         SuccessiveIncorrectAnswersTaskObjectFactory) {}
 
-  createFromBackendDict(backendDict: ITaskEntryBackendDict): ExplorationTask {
+  createNewObsoleteTask(
+      expId: string, expVersion: number, taskType: ExplorationTaskType,
+      stateName: string): ExplorationTask {
+    return this.createFromBackendDict({
+      entity_type: ImprovementsConstants.TASK_ENTITY_TYPE_EXPLORATION,
+      entity_id: expId,
+      entity_version: expVersion,
+      task_type: taskType,
+      target_type: ImprovementsConstants.TASK_TARGET_TYPE_STATE,
+      target_id: stateName,
+      issue_description: null,
+      status: ImprovementsConstants.TASK_STATUS_OBSOLETE,
+      resolver_username: null,
+      resolver_profile_picture_data_url: null,
+      resolved_on_msecs: null,
+    });
+  }
+
+  createNewResolvedTask(
+      expId: string, expVersion: number, taskType: ExplorationTaskType,
+      stateName: string): ExplorationTask {
+    return this.createFromBackendDict({
+      entity_type: ImprovementsConstants.TASK_ENTITY_TYPE_EXPLORATION,
+      entity_id: expId,
+      entity_version: expVersion,
+      task_type: taskType,
+      target_type: ImprovementsConstants.TASK_TARGET_TYPE_STATE,
+      target_id: stateName,
+      issue_description: null,
+      status: ImprovementsConstants.TASK_STATUS_RESOLVED,
+      resolver_username: null,
+      resolver_profile_picture_data_url: null,
+      resolved_on_msecs: null,
+    });
+  }
+
+  createFromBackendDict(
+      backendDict: ExplorationTaskBackendDict): ExplorationTask {
+    const taskType = backendDict.task_type;
     switch (backendDict.task_type) {
-      case ImprovementsConstants.TASK_TYPE_HIGH_BOUNCE_RATE:
+      case 'high_bounce_rate':
         return this.hbrTaskObjectFactory.createFromBackendDict(backendDict);
-      case ImprovementsConstants.TASK_TYPE_INEFFECTIVE_FEEDBACK_LOOP:
+      case 'ineffective_feedback_loop':
         return this.iflTaskObjectFactory.createFromBackendDict(backendDict);
-      case ImprovementsConstants.TASK_TYPE_NEEDS_GUIDING_RESPONSES:
+      case 'needs_guiding_responses':
         return this.ngrTaskObjectFactory.createFromBackendDict(backendDict);
-      case ImprovementsConstants.TASK_TYPE_SUCCESSIVE_INCORRECT_ANSWERS:
+      case 'successive_incorrect_answers':
         return this.siaTaskObjectFactory.createFromBackendDict(backendDict);
-      default:
+      default: {
+        const invalidBackendDict: never = backendDict;
         throw new Error(
-          'Backend dict does not match any known task type: ' +
-          JSON.stringify(backendDict));
+          `Unsupported task type "${taskType}" for backend dict: ` +
+          JSON.stringify(invalidBackendDict));
+      }
     }
   }
 }

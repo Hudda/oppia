@@ -18,7 +18,7 @@
 
 require(
   'components/common-layout-directives/common-elements/' +
-  'loading-dots.directive.ts');
+  'loading-dots.component.ts');
 require('components/summary-tile/exploration-summary-tile.directive.ts');
 require('components/summary-tile/collection-summary-tile.directive.ts');
 require('pages/library-page/search-results/search-results.directive.ts');
@@ -111,7 +111,7 @@ angular.module('oppia').directive('libraryPage', [
             for (var i = 0; i < ctrl.libraryGroups.length; i++) {
               var carouselJQuerySelector = (
                 '.oppia-library-carousel-tiles:eq(n)'.replace(
-                  'n', <string><any>i));
+                  'n', String(i)));
               var carouselScrollPositionPx = $(
                 carouselJQuerySelector).scrollLeft();
               var index = Math.ceil(

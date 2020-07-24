@@ -46,7 +46,6 @@ import utils
 
 (exp_models, user_models) = models.Registry.import_models([
     models.NAMES.exploration, models.NAMES.user])
-gae_image_services = models.Registry.import_gae_image_services()
 search_services = models.Registry.import_search_services()
 transaction_services = models.Registry.import_transaction_services()
 
@@ -187,7 +186,7 @@ class ExplorationQueriesUnitTests(ExplorationServicesUnitTests):
         self.assertEqual(
             exp_services.get_exploration_titles_and_categories(['A']), {
                 'A': {
-                    'category': 'A category',
+                    'category': 'Algebra',
                     'title': 'TitleA'
                 }
             })
@@ -196,25 +195,25 @@ class ExplorationQueriesUnitTests(ExplorationServicesUnitTests):
         self.assertEqual(
             exp_services.get_exploration_titles_and_categories(['A']), {
                 'A': {
-                    'category': 'A category',
+                    'category': 'Algebra',
                     'title': 'TitleA'
                 }
             })
         self.assertEqual(
             exp_services.get_exploration_titles_and_categories(['A', 'B']), {
                 'A': {
-                    'category': 'A category',
+                    'category': 'Algebra',
                     'title': 'TitleA',
                 },
                 'B': {
-                    'category': 'A category',
+                    'category': 'Algebra',
                     'title': 'TitleB',
                 },
             })
         self.assertEqual(
             exp_services.get_exploration_titles_and_categories(['A', 'C']), {
                 'A': {
-                    'category': 'A category',
+                    'category': 'Algebra',
                     'title': 'TitleA'
                 }
             })
@@ -999,6 +998,47 @@ class ExplorationCreateAndDeleteUnitTests(ExplorationServicesUnitTests):
                 'Exploration exp_id_1, versions [1] could not be converted to '
                 'latest schema version.')):
             exp_fetchers.get_multiple_explorations_by_version('exp_id_1', [1])
+
+
+    def test_save_multi_exploration_math_rich_text_info_model(self):
+        multiple_explorations_math_rich_text_info = []
+
+        math_rich_text_info1 = (
+            exp_domain.ExplorationMathRichTextInfo(
+                'exp_id1', True, ['abc1', 'xyz1']))
+        multiple_explorations_math_rich_text_info.append(math_rich_text_info1)
+        math_rich_text_info2 = (
+            exp_domain.ExplorationMathRichTextInfo(
+                'exp_id2', True, ['abc2', 'xyz2']))
+        multiple_explorations_math_rich_text_info.append(math_rich_text_info2)
+        math_rich_text_info3 = (
+            exp_domain.ExplorationMathRichTextInfo(
+                'exp_id3', True, ['abc3', 'xyz3']))
+        multiple_explorations_math_rich_text_info.append(math_rich_text_info3)
+
+        exp_services.save_multi_exploration_math_rich_text_info_model(
+            multiple_explorations_math_rich_text_info)
+
+        self.assertEqual(
+            exp_models.ExplorationMathRichTextInfoModel.get_all().count(), 3)
+
+        exp1_math_image_model = (
+            exp_models.ExplorationMathRichTextInfoModel.get_by_id('exp_id1'))
+        self.assertEqual(
+            sorted(exp1_math_image_model.latex_strings_without_svg),
+            sorted(['abc1', 'xyz1']))
+
+        exp2_math_image_model = (
+            exp_models.ExplorationMathRichTextInfoModel.get_by_id('exp_id2'))
+        self.assertEqual(
+            sorted(exp2_math_image_model.latex_strings_without_svg),
+            sorted(['abc2', 'xyz2']))
+
+        exp3_math_image_model = (
+            exp_models.ExplorationMathRichTextInfoModel.get_by_id('exp_id3'))
+        self.assertEqual(
+            sorted(exp3_math_image_model.latex_strings_without_svg),
+            sorted(['abc3', 'xyz3']))
 
 
 class LoadingAndDeletionOfExplorationDemosTests(ExplorationServicesUnitTests):
@@ -1873,16 +1913,23 @@ title: A title
         fs = fs_domain.AbstractFileSystem(
             fs_domain.GcsFileSystem(
                 feconf.ENTITY_TYPE_EXPLORATION, self.EXP_0_ID))
-        fs.commit('abc.png', raw_image)
+        fs.commit('image/abc.png', raw_image)
+        # Audio files should not be included in asset downloads.
+        with python_utils.open_file(
+            os.path.join(feconf.TESTS_DATA_DIR, 'cafe.mp3'),
+            mode='rb', encoding=None) as f:
+            raw_audio = f.read()
+        fs.commit('audio/cafe.mp3', raw_audio)
 
         zip_file_output = exp_services.export_to_zip_file(self.EXP_0_ID)
         zf = zipfile.ZipFile(python_utils.string_io(
             buffer_value=zip_file_output))
 
-        self.assertEqual(zf.namelist(), ['A title.yaml', 'assets/abc.png'])
+        self.assertEqual(
+            zf.namelist(), ['A title.yaml', 'assets/image/abc.png'])
         self.assertEqual(
             zf.open('A title.yaml').read(), self.SAMPLE_YAML_CONTENT)
-        self.assertEqual(zf.open('assets/abc.png').read(), raw_image)
+        self.assertEqual(zf.open('assets/image/abc.png').read(), raw_image)
 
     def test_export_by_versions(self):
         """Test export_to_zip_file() for different versions."""
@@ -3057,7 +3104,6 @@ class ExplorationCommitLogUnitTests(ExplorationServicesUnitTests):
     EXP_ID_2 = 'eid2'
 
     COMMIT_ALBERT_CREATE_EXP_1 = {
-        'username': ALBERT_NAME,
         'version': 1,
         'exploration_id': EXP_ID_1,
         'commit_type': 'create',
@@ -3068,7 +3114,6 @@ class ExplorationCommitLogUnitTests(ExplorationServicesUnitTests):
     }
 
     COMMIT_BOB_EDIT_EXP_1 = {
-        'username': BOB_NAME,
         'version': 2,
         'exploration_id': EXP_ID_1,
         'commit_type': 'edit',
@@ -3079,7 +3124,6 @@ class ExplorationCommitLogUnitTests(ExplorationServicesUnitTests):
     }
 
     COMMIT_ALBERT_CREATE_EXP_2 = {
-        'username': ALBERT_NAME,
         'version': 1,
         'exploration_id': 'eid2',
         'commit_type': 'create',
@@ -3090,7 +3134,6 @@ class ExplorationCommitLogUnitTests(ExplorationServicesUnitTests):
     }
 
     COMMIT_ALBERT_EDIT_EXP_1 = {
-        'username': 'albert',
         'version': 3,
         'exploration_id': 'eid1',
         'commit_type': 'edit',
@@ -3101,7 +3144,6 @@ class ExplorationCommitLogUnitTests(ExplorationServicesUnitTests):
     }
 
     COMMIT_ALBERT_EDIT_EXP_2 = {
-        'username': 'albert',
         'version': 2,
         'exploration_id': 'eid2',
         'commit_type': 'edit',
@@ -3123,7 +3165,6 @@ class ExplorationCommitLogUnitTests(ExplorationServicesUnitTests):
     }
 
     COMMIT_ALBERT_DELETE_EXP_1 = {
-        'username': 'albert',
         'version': 5,
         'exploration_id': 'eid1',
         'commit_type': 'delete',
@@ -3134,7 +3175,6 @@ class ExplorationCommitLogUnitTests(ExplorationServicesUnitTests):
     }
 
     COMMIT_ALBERT_PUBLISH_EXP_2 = {
-        'username': 'albert',
         'version': None,
         'exploration_id': 'eid2',
         'commit_type': 'edit',
@@ -3817,7 +3857,7 @@ title: Old Title
         exploration = self.save_new_default_exploration('exp_id', 'user_id')
 
         self.assertEqual(exploration.title, 'A title')
-        self.assertEqual(exploration.category, 'A category')
+        self.assertEqual(exploration.category, 'Algebra')
         self.assertEqual(
             exploration.objective, feconf.DEFAULT_EXPLORATION_OBJECTIVE)
         self.assertEqual(exploration.language_code, 'en')
@@ -3828,7 +3868,7 @@ title: Old Title
         exploration = exp_fetchers.get_exploration_by_id('exp_id')
 
         self.assertEqual(exploration.title, 'A title')
-        self.assertEqual(exploration.category, 'A category')
+        self.assertEqual(exploration.category, 'Algebra')
         self.assertEqual(
             exploration.objective, feconf.DEFAULT_EXPLORATION_OBJECTIVE)
         self.assertEqual(exploration.language_code, 'en')
